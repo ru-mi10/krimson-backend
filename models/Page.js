@@ -45,6 +45,15 @@ const pageSchema = new mongoose.Schema(
       icon: { type: String, default: '' },
       componentHints: [{ type: String }],
     },
+    // Generated React component code for this page (populated by AI or manual edit)
+    generatedCode: {
+      type: String,
+      default: '',
+    },
+    codeGeneratedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

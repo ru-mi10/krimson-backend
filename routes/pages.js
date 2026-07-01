@@ -189,3 +189,24 @@ router.delete('/:slug/pages/:pageSlug', protect, async (req, res, next) => {
 })
 
 export default router
+
+// ── PUT /api/systems/:slug/pages/:pageSlug/code — Save generated code ──────
+router.put('/:slug/pages/:pageSlug/code', protect, async (req, res, next) => {
+  try {
+    const system = await getOwnedSystem(req.params.slug, req.user._id, res)
+    if (!system) return
+
+    const page = await Page.findOne({ systemId: system._id, slug: req.params.pageSlug })
+    if (!page) return errorResponse(res, 'Page not found', 404)
+
+    if (typeof req.body.code !== 'string') return errorResponse(res, 'code must be a string')
+
+    page.generatedCode = req.body.code
+    page.codeGeneratedAt = new Date()
+    await page.save()
+
+    successResponse(res, { page })
+  } catch (error) {
+    next(error)
+  }
+})

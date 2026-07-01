@@ -174,4 +174,69 @@ Rules: professional not trendy, valid hex for accentColor, no neon.
   }
 )
 
+// ── POST /api/ai/generate-page-code — Generate real React component for a page
+// Input: { pageName, pageDescription, systemName, themeTokens }
+// Output: { code: "...jsx string..." }
+router.post(
+  '/generate-page-code',
+  protect,
+  aiLimiter,
+  [
+    body('pageName').trim().notEmpty().isLength({ max: 100 }),
+    body('pageDescription').optional().isLength({ max: 300 }),
+    body('systemName').optional().isLength({ max: 100 }),
+  ],
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) return errorResponse(res, errors.array()[0].msg)
+
+      const groq = getGroq()
+      if (!groq) return errorResponse(res, 'AI features are not configured', 503)
+
+      const { pageName, pageDescription = '', systemName = '', themeTokens = {} } = req.body
+
+      const p = `
+Generate a single React functional component for a page called "${pageName}" in a product called "${systemName}".
+Page purpose: ${pageDescription || 'General product page'}.
+
+Use these theme values as inline styles (do NOT use Tailwind classes, use style={{}} objects):
+- Background: ${themeTokens.backgroundColor || '#09090B'}
+- Surface: ${themeTokens.surfaceColor || '#111113'}
+- Border: ${themeTokens.borderColor || '#27272A'}
+- Accent: ${themeTokens.accentColor || '#DC2626'}
+- Primary text: ${themeTokens.primaryTextColor || '#FAFAFA'}
+- Secondary text: ${themeTokens.secondaryTextColor || '#A1A1AA'}
+
+Rules:
+- Output ONLY the JSX code, no markdown fences, no explanation.
+- Component must be named exactly "GeneratedPage" and use "export default function GeneratedPage() {...}".
+- Use only inline style objects, no external CSS, no Tailwind, no imports besides React itself (assume React is globally available, do not import it).
+- Include realistic mock data relevant to the page purpose (numbers, names, rows) — no lorem ipsum.
+- Include a heading, and 2-4 sections appropriate to the page (cards, table, list, form — whatever fits).
+- Keep it visually clean, professional, structured — not flashy.
+- Code must be complete and directly renderable, no placeholders like "// add more here".
+`
+
+      const result = await groq.chat.completions.create({
+        model: 'llama-3.1-8b-instant',
+        messages: [{ role: 'user', content: p }],
+        temperature: 0.5,
+        max_tokens: 2000,
+      })
+
+      let code = result.choices[0].message.content
+      code = code.replace(/```jsx|```javascript|```js|```/g, '').trim()
+
+      if (!code.includes('GeneratedPage')) {
+        return errorResponse(res, 'AI returned unexpected code. Please try again.')
+      }
+
+      successResponse(res, { code })
+    } catch (e) {
+      next(e)
+    }
+  }
+)
+
 export default router
