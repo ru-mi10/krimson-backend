@@ -19,7 +19,7 @@ const getOwnedSystem = async (systemSlug, userId, res) => {
   return system
 }
 
-// ── POST /api/systems/:slug/pages — Add a Page ────────────────────────────
+// ── POST /api/systems/:slug/pages ─────────────────────────────────────────
 router.post(
   '/:slug/pages',
   protect,
@@ -38,13 +38,11 @@ router.post(
 
       const { name, description = '', icon = '' } = req.body
 
-      // Slug unique within this system
       const baseSlug = slugify(name)
       const slug = await uniqueSlug(baseSlug, (s) =>
         Page.exists({ systemId: system._id, slug: s })
       )
 
-      // Place at end of current page list
       const maxOrder = await Page.findOne({ systemId: system._id })
         .sort({ order: -1 })
         .select('order')
@@ -73,13 +71,10 @@ router.post(
   }
 )
 
-// ── GET /api/systems/:slug/pages — List all Pages in a System ────────────
+// ── GET /api/systems/:slug/pages ──────────────────────────────────────────
 router.get('/:slug/pages', protect, async (req, res, next) => {
   try {
-    const system = await System.findOne({
-      slug: req.params.slug,
-      ownerId: req.user._id,
-    })
+    const system = await System.findOne({ slug: req.params.slug, ownerId: req.user._id })
     if (!system) return errorResponse(res, 'System not found', 404)
 
     const pages = await Page.find({ systemId: system._id }).sort({ order: 1 })
@@ -89,7 +84,7 @@ router.get('/:slug/pages', protect, async (req, res, next) => {
   }
 })
 
-// ── PUT /api/systems/:slug/pages/:pageSlug — Update a Page ───────────────
+// ── PUT /api/systems/:slug/pages/:pageSlug ────────────────────────────────
 router.put(
   '/:slug/pages/:pageSlug',
   protect,
@@ -129,8 +124,7 @@ router.put(
   }
 )
 
-// ── PUT /api/systems/:slug/pages/reorder — Reorder Pages ─────────────────
-// Body: { pages: [{ _id, order }] }
+// ── PUT /api/systems/:slug/pages/reorder ──────────────────────────────────
 router.put('/:slug/pages/reorder', protect, async (req, res, next) => {
   try {
     const system = await getOwnedSystem(req.params.slug, req.user._id, res)
@@ -139,13 +133,8 @@ router.put('/:slug/pages/reorder', protect, async (req, res, next) => {
     const { pages } = req.body
     if (!Array.isArray(pages)) return errorResponse(res, 'pages must be an array')
 
-    // Bulk update orders
     const updates = pages.map(({ _id, order }) =>
-      Page.findOneAndUpdate(
-        { _id, systemId: system._id },
-        { order },
-        { new: true }
-      )
+      Page.findOneAndUpdate({ _id, systemId: system._id }, { order }, { new: true })
     )
     await Promise.all(updates)
 
@@ -163,7 +152,28 @@ router.put('/:slug/pages/reorder', protect, async (req, res, next) => {
   }
 })
 
-// ── DELETE /api/systems/:slug/pages/:pageSlug — Delete a Page ────────────
+// ── PUT /api/systems/:slug/pages/:pageSlug/code ───────────────────────────
+router.put('/:slug/pages/:pageSlug/code', protect, async (req, res, next) => {
+  try {
+    const system = await getOwnedSystem(req.params.slug, req.user._id, res)
+    if (!system) return
+
+    const page = await Page.findOne({ systemId: system._id, slug: req.params.pageSlug })
+    if (!page) return errorResponse(res, 'Page not found', 404)
+
+    if (typeof req.body.code !== 'string') return errorResponse(res, 'code must be a string')
+
+    page.generatedCode = req.body.code
+    page.codeGeneratedAt = new Date()
+    await page.save()
+
+    successResponse(res, { page })
+  } catch (error) {
+    next(error)
+  }
+})
+
+// ── DELETE /api/systems/:slug/pages/:pageSlug ─────────────────────────────
 router.delete('/:slug/pages/:pageSlug', protect, async (req, res, next) => {
   try {
     const system = await getOwnedSystem(req.params.slug, req.user._id, res)
@@ -189,24 +199,3 @@ router.delete('/:slug/pages/:pageSlug', protect, async (req, res, next) => {
 })
 
 export default router
-
-// ── PUT /api/systems/:slug/pages/:pageSlug/code — Save generated code ──────
-router.put('/:slug/pages/:pageSlug/code', protect, async (req, res, next) => {
-  try {
-    const system = await getOwnedSystem(req.params.slug, req.user._id, res)
-    if (!system) return
-
-    const page = await Page.findOne({ systemId: system._id, slug: req.params.pageSlug })
-    if (!page) return errorResponse(res, 'Page not found', 404)
-
-    if (typeof req.body.code !== 'string') return errorResponse(res, 'code must be a string')
-
-    page.generatedCode = req.body.code
-    page.codeGeneratedAt = new Date()
-    await page.save()
-
-    successResponse(res, { page })
-  } catch (error) {
-    next(error)
-  }
-})

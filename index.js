@@ -26,6 +26,7 @@ import themeRoutes from './routes/themes.js'
 import versionRoutes from './routes/versions.js'
 import exploreRoutes from './routes/explore.js'
 import aiRoutes from './routes/ai.js'
+import exportRoutes from './routes/export.js'
 
 const app = express()
 
@@ -57,6 +58,7 @@ app.use('/api/systems', themeRoutes)      // /api/systems/:systemId/theme
 app.use('/api/systems', versionRoutes)    // /api/systems/:systemId/versions
 app.use('/api/explore', exploreRoutes)
 app.use('/api/ai', aiRoutes)
+app.use('/api/export', exportRoutes)
 
 // ── Health check ───────────────────────────────────────────────────────────
 
