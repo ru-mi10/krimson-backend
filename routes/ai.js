@@ -260,26 +260,32 @@ router.post(
       const groq = getGroq()
       if (!groq) return errorResponse(res, 'AI features are not configured', 503)
 
-      const { currentCode, instruction, themeTokens = {} } = req.body
+      const { currentCode, instruction, themeTokens = {}, history = [] } = req.body
 
-      const p = `
-Here is an existing React component:
+      const messages = [
+        ...history.map(m => ({ role: m.role, content: m.content })),
+        {
+          role: 'user',
+          content: `
+Here is the current React component:
 
 ${currentCode}
 
 Apply this change: "${instruction}"
 
 Rules:
-- Output ONLY the complete updated JSX code, no markdown fences, no explanation.
-- Keep the component named "GeneratedPage" with "export default function GeneratedPage() {...}".
-- Use only inline style objects, no Tailwind, no external imports (React is globally available).
-- Preserve the existing theme colors unless the instruction explicitly asks to change them.
-- Preserve everything unrelated to the requested change.
-- Code must be complete and directly renderable, no placeholders.
+- Output ONLY the complete updated JSX code. No markdown. No explanation.
+- Keep component named "GeneratedPage" with "function GeneratedPage() {...}".
+- Use only inline style={{}} objects. No imports. No exports.
+- Preserve everything unrelated to the change.
+- Theme accent: ${themeTokens.accentColor || '#DC2626'}, background: ${themeTokens.backgroundColor || '#09090B'}.
 `
+        }
+      ]
+
       const result = await groq.chat.completions.create({
-        model: 'llama-3.1-8b-instant',
-        messages: [{ role: 'user', content: p }],
+        model: 'llama-3.3-70b-versatile',
+        messages,
         temperature: 0.4,
         max_tokens: 2000,
       })
@@ -291,7 +297,7 @@ Rules:
         return errorResponse(res, 'AI returned unexpected code. Please try again.')
       }
 
-      successResponse(res, { code })
+      successResponse(res, { code, summary: `Applied: "${instruction}"` })
     } catch (e) {
       next(e)
     }

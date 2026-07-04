@@ -94,7 +94,11 @@ const systemSchema = new mongoose.Schema(
     stats: {
       forkCount: { type: Number, default: 0 },
       viewCount: { type: Number, default: 0 },
+      likeCount: { type: Number, default: 0 },
     },
+
+    // Like tracking — array of user IDs who liked this system
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 
     // Current published version snapshot reference
     publishedVersionId: {

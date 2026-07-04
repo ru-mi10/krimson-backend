@@ -104,8 +104,9 @@ router.get('/:slug', optionalAuth, async (req, res, next) => {
       return errorResponse(res, 'System not found', 404)
     }
 
-    // Increment view count without a blocking write
+    // Increment view count and return updated value
     if (!isOwner) {
+      system.stats.viewCount += 1
       System.findByIdAndUpdate(system._id, { $inc: { 'stats.viewCount': 1 } }).exec()
     }
 
@@ -115,7 +116,7 @@ router.get('/:slug', optionalAuth, async (req, res, next) => {
       Theme.findOne({ systemId: system._id }),
     ])
 
-    successResponse(res, { system, pages, theme, isOwner: !!isOwner })
+    successResponse(res, { system, pages, theme, isOwner: !!isOwner, isLiked: req.user ? system.likes.some(id => id.toString() === req.user._id.toString()) : false })
   } catch (error) {
     next(error)
   }
@@ -272,6 +273,34 @@ router.post('/:slug/fork', protect, async (req, res, next) => {
     })
 
     successResponse(res, { system: fork }, 201)
+  } catch (error) {
+    next(error)
+  }
+})
+
+// ── POST /api/systems/:slug/like — Toggle like ────────────────────────────
+router.post('/:slug/like', protect, async (req, res, next) => {
+  try {
+    const system = await System.findOne({ slug: req.params.slug })
+    if (!system) return errorResponse(res, 'System not found', 404)
+    if (system.visibility !== 'public') return errorResponse(res, 'System not found', 404)
+
+    const userId = req.user._id
+    const alreadyLiked = system.likes.some(id => id.toString() === userId.toString())
+
+    if (alreadyLiked) {
+      system.likes.pull(userId)
+      system.stats.likeCount = Math.max(0, system.stats.likeCount - 1)
+    } else {
+      system.likes.push(userId)
+      system.stats.likeCount += 1
+    }
+
+    await system.save()
+    successResponse(res, {
+      liked: !alreadyLiked,
+      likeCount: system.stats.likeCount,
+    })
   } catch (error) {
     next(error)
   }
